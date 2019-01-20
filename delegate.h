@@ -63,7 +63,7 @@ namespace Delegate
      * @tparam size Number of bytes of storage per delegate.
      * @tparam alignement How to align the data.
      */
-    template <size_t size = 12, size_t alignment = 4>
+    template <size_t size = 24, size_t alignment = 8>
     struct TemplateFunctorArgs
     {
     private:

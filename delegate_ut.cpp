@@ -1,9 +1,11 @@
 #include "delegate.h"
 
-#define CATCH_CONFIG_RUNNER
+#ifdef WIN32
 #define DO_NOT_USE_WMAIN
-#define CATCH_CONFIG_FAST_COMPILE
 #define CATCH_CONFIG_WINDOWS_CRTDBG
+#endif
+#define CATCH_CONFIG_RUNNER
+#define CATCH_CONFIG_FAST_COMPILE
 #include "catch.hpp"
 
 namespace StaticFixture
@@ -175,21 +177,36 @@ TEMPLATE_TEST_CASE("Storage Test", "[storage_test]", Delegate::TrivialType, Dele
     uint32_t param0 = 111;
     uint32_t param1 = 222;
     uint32_t param2 = 333;
+    uint32_t param3 = 444;
+    uint32_t param4 = 555;
+    uint32_t param5 = 666;
 
     static uint32_t sparam0 = 0;
     static uint32_t sparam1 = 0;
     static uint32_t sparam2 = 0;
+    static uint32_t sparam3 = 0;
+    static uint32_t sparam4 = 0;
+    static uint32_t sparam5 = 0;
 
     auto lambda1 = [](){};
     auto lambda4 = [param0](){sparam0 = param0;};
     auto lambda8 = [param0, param1](){sparam0 = param0; sparam1 = param1;};
     auto lambda12 = [param0, param1, param2](){sparam0 = param0; sparam1 = param1; sparam2 = param2;};
+    auto lambda16 = [param0, param1, param2, param3](){sparam0 = param0; sparam1 = param1; sparam2 = param2;
+                                                       sparam3 = param3;};
+    auto lambda20 = [param0, param1, param2, param3, param4](){sparam0 = param0; sparam1 = param1; sparam2 = param2;
+                                                               sparam3 = param3; sparam4 = param4;};
+    auto lambda24 = [param0, param1, param2, param3, param4, param5](){sparam0 = param0; sparam1 = param1; sparam2 = param2;
+                                                                       sparam3 = param3; sparam4 = param4; sparam5 = param5;};
 
     static_assert(sizeof(lambda1) == 1, "A capture-less lambda is assumed to be one byte");
     static_assert(sizeof(lambda4) == 4, "A 4-byte capture should result in a 4-byte lambda");
     static_assert(sizeof(lambda8) == 8, "A 8-byte capture should result in a 8-byte lambda");
     static_assert(sizeof(lambda12) == 12, "A 12-byte capture should result in a 12-byte lambda");
-    static_assert(sizeof(Delegate::FunctorArgs) == 12, "This test assumes 12-bytes of storage");
+    static_assert(sizeof(lambda16) == 16, "A 16-byte capture should result in a 16-byte lambda");
+    static_assert(sizeof(lambda20) == 20, "A 20-byte capture should result in a 20-byte lambda");
+    static_assert(sizeof(lambda24) == 24, "A 24-byte capture should result in a 24-byte lambda");
+    static_assert(sizeof(Delegate::FunctorArgs) == 24, "This test assumes 24-bytes of storage");
 
     Delegate::Func<TestType, void> delegate1 = lambda1;
     delegate1();
@@ -529,3 +546,4 @@ int main(int, char*[])
 
     session.run();
 }
+
