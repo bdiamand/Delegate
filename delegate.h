@@ -143,7 +143,7 @@ namespace Delegate
      * @return The functor return type.
      */
     template<typename T, typename Result, typename... Arguments>
-    static Result typed_call(const FunctorArgs &args, Arguments... arguments)
+    static Result typed_call(const FunctorArgs &args, Arguments&&... arguments)
     {
         return get_typed_functor<T>(args)(std::forward<Arguments>(arguments)...);
     }
@@ -190,7 +190,7 @@ namespace Delegate
      * Another (smaller) name for the type-erased call function.
      */
     template<typename Result, typename... Arguments>
-    using func_call = Result (*)(const FunctorArgs &args, Arguments... arguments);
+    using func_call = Result (*)(const FunctorArgs &args, Arguments&&... arguments);
 
     /**
      * A trivial delegate - trivially constructable and copyable.  This delegate is smaller than a non-trivial one, and
@@ -207,7 +207,7 @@ namespace Delegate
          * Default (delegating) constructor.
          */
         Func() :
-            Func([](Arguments...){return Result();})
+            Func([](Arguments&&...){return Result();})
         {
         }
 
@@ -265,7 +265,7 @@ namespace Delegate
          *
          * @return Returns the Result type.
          */
-        Result operator()(Arguments&&... arguments) const
+        Result operator()(Arguments... arguments) const
         {
             return call(args, std::forward<Arguments>(arguments)...);
         }
@@ -469,7 +469,7 @@ namespace Delegate
          * Default constructor.  Note that args is left uninitialized since it's unused here.
          */
         Func() :
-            call([](const FunctorArgs &, Arguments...){return Result();}),
+            call([](const FunctorArgs &, Arguments&&...){return Result();}),
             vtable(&Vtable::empty_vtable<>())
         {
         }
@@ -589,7 +589,7 @@ namespace Delegate
          *
          * @return Returns the Result type.
          */
-        Result operator()(Arguments&&... arguments) const
+        Result operator()(Arguments... arguments) const
         {
             return call(args, std::forward<Arguments>(arguments)...);
         }
