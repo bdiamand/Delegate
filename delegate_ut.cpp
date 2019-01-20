@@ -520,6 +520,65 @@ TEMPLATE_TEST_CASE("Trivial Function Default",
     }
 }
 
+TEMPLATE_TEST_CASE("Semi-Perfect Forwarding",
+                   "[semi_perfect_forwarding]",
+                   Delegate::TrivialType,
+                   Delegate::NonMovableType)
+{
+    SECTION("non-reference type to non-reference argument")
+    {
+        ClassFixture::reset_counts();
+        {
+            Delegate::Func<TestType, void, ClassFixture> f([](ClassFixture fixture){fixture.func_void();});
+            ClassFixture fixture;
+            REQUIRE(ClassFixture::construct_count == 1);
+            REQUIRE(ClassFixture::destruct_count == 0);
+            f(fixture);
+            REQUIRE(ClassFixture::construct_count == 3);
+            REQUIRE(ClassFixture::destruct_count == 2);
+        }
+    }
+    SECTION("non-reference type to rvalue reference argument")
+    {
+        ClassFixture::reset_counts();
+        {
+            Delegate::Func<TestType, void, ClassFixture> f([](ClassFixture&& fixture){fixture.func_void();});
+            ClassFixture fixture;
+            REQUIRE(ClassFixture::construct_count == 1);
+            REQUIRE(ClassFixture::destruct_count == 0);
+            f(fixture);
+            REQUIRE(ClassFixture::construct_count == 2);
+            REQUIRE(ClassFixture::destruct_count == 1);
+        }
+    }
+    SECTION("rvalue reference type to non-reference argument")
+    {
+        ClassFixture::reset_counts();
+        {
+            Delegate::Func<TestType, void, ClassFixture&&> f([](ClassFixture fixture){fixture.func_void();});
+            ClassFixture fixture;
+            REQUIRE(ClassFixture::construct_count == 1);
+            REQUIRE(ClassFixture::destruct_count == 0);
+            f(std::move(fixture));
+            REQUIRE(ClassFixture::construct_count == 2);
+            REQUIRE(ClassFixture::destruct_count == 1);
+        }
+    }
+    SECTION("rvalue reference type to rvalue reference argument")
+    {
+        ClassFixture::reset_counts();
+        {
+            Delegate::Func<TestType, void, ClassFixture&&> f([](ClassFixture&& fixture){fixture.func_void();});
+            ClassFixture fixture;
+            REQUIRE(ClassFixture::construct_count == 1);
+            REQUIRE(ClassFixture::destruct_count == 0);
+            f(std::move(fixture));
+            REQUIRE(ClassFixture::construct_count == 1);
+            REQUIRE(ClassFixture::destruct_count == 0);
+        }
+    }
+}
+
 int main(int, char*[])
 {
     Catch::Session session;
