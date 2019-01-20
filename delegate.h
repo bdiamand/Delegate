@@ -259,13 +259,13 @@ namespace Delegate
         }
 
         /**
-         * Pure forwarding function call operator.
+         * Perfect forwarding function call operator.
          *
          * @param arguments The arguments to pass through to the delegate.
          *
          * @return Returns the Result type.
          */
-        Result operator()(Arguments... arguments) const
+        Result operator()(Arguments&&... arguments) const
         {
             return call(args, std::forward<Arguments>(arguments)...);
         }
@@ -583,13 +583,13 @@ namespace Delegate
 
     public:
         /**
-         * Pure forwarding function call operator.
+         * Perfect forwarding function call operator.
          *
          * @param arguments The arguments to pass through to the delegate.
          *
          * @return Returns the Result type.
          */
-        Result operator()(Arguments... arguments) const
+        Result operator()(Arguments&&... arguments) const
         {
             return call(args, std::forward<Arguments>(arguments)...);
         }
