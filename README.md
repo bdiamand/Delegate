@@ -7,6 +7,8 @@ All three are fixed size (never allocate), can't be in an uncallable state, and 
 
 Depends on https://github.com/catchorg/Catch2, but only for the unit tests.  See the unit tests for examples for non-POD types and move semantics (e.g. to capture things like unique_ptr).
 
+Note: The code should work fine for C++11, although for lambdas with move-on-capture, at least C++14 is needed.
+
 Two examples uses:
 
 ```c++
