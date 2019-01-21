@@ -54,8 +54,21 @@
  *
  * Note: See the accompanying unit tests for some good examples of use.
  */
+
 namespace Delegate
 {
+    /*
+     * Allow the delegate size to be specified as a compile-time constant.
+     */
+    #ifndef DELEGATE_ARGS_SIZE
+     #define DELEGATE_ARGS_SIZE sizeof(int) + sizeof(int *)
+     #define DELEGATE_ARGS_SIZE_UNDEF
+    #endif
+    #ifndef DELEGATE_ARGS_ALIGN
+     #define DELEGATE_ARGS_ALIGN 8
+     #define DELEGATE_ARGS_ALIGN_UNDEF
+    #endif
+
     /**
      * Templated class representing the aligned storage of a delegate.  The intent is for all delegates to have the
      * same size, and this information is purposefully not part of the delegate signature.
@@ -63,7 +76,7 @@ namespace Delegate
      * @tparam size Number of bytes of storage per delegate.
      * @tparam alignement How to align the data.
      */
-    template <size_t size = 24, size_t alignment = 8>
+    template <size_t size = DELEGATE_ARGS_SIZE, size_t alignment = DELEGATE_ARGS_ALIGN>
     struct TemplateFunctorArgs
     {
     private:
@@ -72,6 +85,15 @@ namespace Delegate
          */
         alignas(alignment) std::array<char, size> args;
     };
+
+    #ifdef DELEGATE_ARGS_SIZE_UNDEF
+     #undef DELEGATE_ARGS_SIZE
+     #undef DELEGATE_ARGS_SIZE_UNDEF
+    #endif
+    #ifdef DELEGATE_ARGS_ALIGN_UNDEF
+     #undef DELEGATE_ARGS_ALIGN
+     #undef DELEGATE_ARGS_ALIGN_UNDEF
+    #endif
 
     /**
      * A simplifying typedef to make the code more readable.
@@ -239,19 +261,14 @@ namespace Delegate
         }
 
         /**
-         * Assignment operator.
+         * Assignment operator.  Pass by value because delegates are small and construction has no side efects.
          *
          * @param other The delegate to copy from.
          *
          * @return Returns a reference to the class.
          */
-        Func &operator=(const Func &other)
+        Func &operator=(Func other)
         {
-            if (this == &other)
-            {
-                return *this;
-            }
-
             args = other.args;
             call = other.call;
 
@@ -259,7 +276,7 @@ namespace Delegate
         }
 
         /**
-         * Perfect forwarding function call operator.
+         * Forwarding function call operator.
          *
          * @param arguments The arguments to pass through to the delegate.
          *
@@ -583,7 +600,7 @@ namespace Delegate
 
     public:
         /**
-         * Perfect forwarding function call operator.
+         * Forwarding function call operator.
          *
          * @param arguments The arguments to pass through to the delegate.
          *
