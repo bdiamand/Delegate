@@ -1,7 +1,8 @@
 # Delegate
 Fixed-size C++ delegates - efficient alternatives to std::function.
 
-Some performance benchmarks against std::function and SG14, among others are here: https://github.com/jamboree/CxxFunctionBenchmark.
+Some performance benchmarks against std::function and SG14 (among others) here: https://github.com/jamboree/CxxFunctionBenchmark.
+
 As of the time of this comment, Delegate is the fastest of the implementations.  Occupies 8 bytes plus capture size on 32-bit systems, and 8 additional bytes on 64-bit systems.
 
 There are two variants, one for capturing non-movable objects (the 99% case) and one for capturing non-copyable objects (the 1% case).
