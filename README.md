@@ -1,15 +1,13 @@
 # Delegate
-Three C++ fixed-size delegate classes, one small and fast, and two slightly larger for non-movable and non-copyable objects.
+Fixed-size C++ delegates, which are efficient alternatives to std::function.
 
-The fastest version uses a single pointer and however much extra space you want for captures.  The more full featured variants use one more pointer.
+There are two variants, one which is for non-movable objects (the 99% case) and one for non-copyable objects (the 1% case).
 
-All three are fixed size (never allocate), can't be in an uncallable state, and are straightforward to use.
+Both variants are fixed size (never allocate), can't be in an uncallable state, and are straightforward to use.
 
-Depends on https://github.com/catchorg/Catch2, but only for the unit tests.  See the unit tests for examples for non-POD types and move semantics (e.g. to capture things like unique_ptr).
+Depends on https://github.com/catchorg/Catch2 only for the unit tests, the delegate.h file can be included and compiled by any compliant C++14 compiler.
 
-Note: The code should work fine for C++11, although for lambdas with move-on-capture, at least C++14 is needed.
-
-Two examples uses:
+See the unit tests for more complete examples, (e.g. to capture things like unique_ptr), but a couple of simple examples:
 
 ```c++
 ...
@@ -23,7 +21,7 @@ int func(int i)
 
 //simple function delegate, no captures
 {
-    Delegate::FuncTrivial<int, int> f = &func;
+    delegate::Delegate<int, int> f = &func;
     ...
     f(12);
 }
@@ -32,7 +30,7 @@ int func(int i)
 {
     double d = 99.5;
     double *something = &d;
-    Delegate::FuncTrivial<double *, double> g = [=](const double d) 
+    delegate::Delegate<double *, double> g = [=](const double d) 
     {
         *something += d;
 
