@@ -28,7 +28,7 @@ int func(int i)
     f(12);
 }
 
-//lambda with POD capture.  To support non-POD captures (many projects never need this), use one of FuncNonMove or FuncNonCopy.
+//lambda with POD capture, but non-POD also works correctly.
 {
     double d = 99.5;
     double *something = &d;
