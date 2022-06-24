@@ -22,7 +22,6 @@
  * ** This comment block must remain in this and derived works.
  */
 
-#pragma once
 #include <array>
 #include <type_traits>
 #include <utility>
@@ -320,7 +319,7 @@ namespace delegate
     {
     protected:
         /**
-         * Default constructor.  Note that args is left uninitialized since it's unused here.
+         * Default constructor.
          */
         Func() : Func([](Arguments...){return Result();})
         {
@@ -338,6 +337,7 @@ namespace delegate
             vtable(&Vtable::get_vtable<T>())
         {
             static_assert(can_emplace<T>(), "Delegate doesn't fit.");
+            static_assert(std::is_same_v<Result, std::invoke_result_t<T, Arguments...>>, "Wrong return type.");
             store_functor(args, functor);
         }
 
@@ -352,6 +352,7 @@ namespace delegate
             call(&typed_call<T, Result, Arguments...>),
             vtable(&Vtable::get_vtable<T>())
         {
+            static_assert(std::is_same_v<Result, std::invoke_result_t<T, Arguments...>>, "Wrong return type.");
             move_functor(args, std::move(functor));
         }
 
