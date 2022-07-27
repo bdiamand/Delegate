@@ -217,7 +217,7 @@ namespace delegate
          *
          * @tparam T The functor type to copy.
          * @param lhs The reference to receive the copied data.
-         * @param lhs The reference to provide the copied data.
+         * @param rhs The reference to provide the copied data.
          */
         template<typename T,
                  typename std::enable_if<can_copy<T>(), T>::type* = nullptr>
@@ -236,7 +236,7 @@ namespace delegate
          *
          * @tparam T The functor type to copy.
          * @param lhs The reference to receive the copied data.
-         * @param lhs The reference to provide the copied data.
+         * @param rhs The reference to provide the copied data.
          */
         template<typename T,
                  typename std::enable_if<!can_copy<T>(), T>::type* = nullptr>
@@ -250,7 +250,7 @@ namespace delegate
          *
          * @tparam T The functor type to move.
          * @param lhs The reference to receive the moved data.
-         * @param lhs The reference to provide the moved data.
+         * @param rhs The reference to provide the moved data.
          */
         template<typename T>
         static void typed_move(FunctorArgs &lhs, FunctorArgs &&rhs)
