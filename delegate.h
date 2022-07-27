@@ -556,7 +556,7 @@ namespace delegate
             }
 
             this->vtable->destroy(this->args);
-            this->vtable->copy(this->args, other.args);
+            other.vtable->copy(this->args, other.args);
             this->call = other.call;
             this->vtable = other.vtable;
 

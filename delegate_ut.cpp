@@ -376,9 +376,9 @@ TEST_CASE("Construct / Destruct", "[construct_destruct]")
         }
 
         /*
-         * One more destruct than constrct because copy-assign kills the assigned to version before the copy.
+         * f_copy_assign was assigned f, which means a new f is constructed into f_copy_assign.
          */
-        REQUIRE(ClassFixture::construct_count == 4);
+        REQUIRE(ClassFixture::construct_count == 5);
         REQUIRE(ClassFixture::destruct_count == 5);
     }
 }
