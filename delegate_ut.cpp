@@ -1,6 +1,6 @@
 #define DELEGATE_ARGS_SIZE 24
 #define DELEGATE_ARGS_ALIGN 8
-#include "delegate.h"
+#include "delegate/delegate.h"
 
 #ifdef WIN32
 #define DO_NOT_USE_WMAIN
@@ -8,7 +8,7 @@
 #endif
 #define CATCH_CONFIG_RUNNER
 #define CATCH_CONFIG_FAST_COMPILE
-#include "catch.hpp"
+#include "catch2/catch.hpp"
 
 namespace StaticFixture
 {
@@ -105,9 +105,7 @@ public:
 int ClassFixture::construct_count = 0;
 int ClassFixture::destruct_count = 0;
 
-/**
- * Test nove-only classes using smart pointers.
- */
+/** Test nove-only classes using smart pointers. */
 TEST_CASE("Smart pointers", "[smart_pointer]")
 {
     ClassFixture::reset_counts();
@@ -115,29 +113,33 @@ TEST_CASE("Smart pointers", "[smart_pointer]")
     {
         {
             std::unique_ptr<ClassFixture> cf(new ClassFixture);
-            delegate::Func<delegate::NonCopyableType, int, int> test([cf = std::move(cf)](int i)
+            delegate::MoveDelegate<int, int> test([cf = std::move(cf)](int i)
             {
                 return cf->func_int_int(i);
             });
+            REQUIRE(!!test == true);
 
             REQUIRE(ClassFixture::construct_count == 1);
             REQUIRE(test(1234) == 1335);
             REQUIRE(ClassFixture::destruct_count == 0);
         }
+        
         REQUIRE(ClassFixture::construct_count == 1);
         REQUIRE(ClassFixture::destruct_count == 1);
     }
     SECTION("Functor Move")
     {
         {
-            delegate::Func<delegate::NonCopyableType, int, int> test;
+            delegate::MoveDelegate<int, int> test;
+            REQUIRE(!!test == false);
             {
                 std::unique_ptr<ClassFixture> cf(new ClassFixture);
                 auto f = [cf = std::move(cf)](int i)
                 {
                     return cf->func_int_int(i);
                 };
-                test = (std::move(f));
+                test = std::move(f);
+                REQUIRE(!!test == true);
             }
 
             REQUIRE(ClassFixture::construct_count == 1);
@@ -150,15 +152,19 @@ TEST_CASE("Smart pointers", "[smart_pointer]")
     SECTION("Delegate Move")
     {
         {
-            delegate::Func<delegate::NonCopyableType, int, int> test;
+            delegate::MoveDelegate<int, int> test;
+            REQUIRE(!!test == false);
             {
                 std::unique_ptr<ClassFixture> cf(new ClassFixture);
                 auto f = [cf = std::move(cf)](int i)
                 {
                     return cf->func_int_int(i);
                 };
-                test = (std::move(f));
-                delegate::Func<delegate::NonCopyableType, int, int> temp(std::move(test));
+                test = std::move(f);
+                REQUIRE(!!test == true);
+                delegate::MoveDelegate<int, int> temp(std::move(test));
+                REQUIRE(!!test == false);
+                REQUIRE(!!temp == true);
 
                 REQUIRE(temp(1234) == 1335);
 
@@ -166,7 +172,6 @@ TEST_CASE("Smart pointers", "[smart_pointer]")
             }
 
             REQUIRE(ClassFixture::construct_count == 1);
-            REQUIRE(test(1234) == 0);
             REQUIRE(ClassFixture::destruct_count == 1);
         }
         REQUIRE(ClassFixture::construct_count == 1);
@@ -174,10 +179,8 @@ TEST_CASE("Smart pointers", "[smart_pointer]")
     }
 }
 
-/**
- * Show that delegates can indeed store up to their maximum size.
- */
-TEMPLATE_TEST_CASE("Storage Test", "[storage_test]", delegate::NonMovableType)
+/** Show that delegates can indeed store up to their maximum size. */
+TEST_CASE("Storage Test", "[storage_test]")
 {
     uint32_t param0 = 111;
     uint32_t param1 = 222;
@@ -219,7 +222,7 @@ TEMPLATE_TEST_CASE("Storage Test", "[storage_test]", delegate::NonMovableType)
     static_assert(sizeof(lambda24) == 24, "A 24-byte capture should result in a 24-byte lambda");
     static_assert(sizeof(delegate::FunctorArgs) == 24, "This test assumes 24-bytes of storage");
 
-    delegate::Func<TestType, void> delegate1 = lambda1;
+    delegate::Delegate<void> delegate1 = lambda1;
     delegate1();
     REQUIRE(sparam0 == 0);
     REQUIRE(sparam1 == 0);
@@ -228,7 +231,7 @@ TEMPLATE_TEST_CASE("Storage Test", "[storage_test]", delegate::NonMovableType)
     REQUIRE(sparam4 == 0);
     REQUIRE(sparam5 == 0);
 
-    delegate::Func<TestType, void> delegate4 = lambda4;
+    delegate::Delegate<void> delegate4 = lambda4;
     delegate4();
     REQUIRE(sparam0 == 111);
     REQUIRE(sparam1 == 0);
@@ -238,7 +241,7 @@ TEMPLATE_TEST_CASE("Storage Test", "[storage_test]", delegate::NonMovableType)
     REQUIRE(sparam5 == 0);
     sparam0 = 0;
 
-    delegate::Func<TestType, void> delegate8 = lambda8;
+    delegate::Delegate<void> delegate8 = lambda8;
     delegate8();
     REQUIRE(sparam0 == 111);
     REQUIRE(sparam1 == 222);
@@ -249,7 +252,7 @@ TEMPLATE_TEST_CASE("Storage Test", "[storage_test]", delegate::NonMovableType)
     sparam0 = 0;
     sparam1 = 0;
 
-    delegate::Func<TestType, void> delegate12 = lambda12;
+    delegate::Delegate<void> delegate12 = lambda12;
     delegate12();
     REQUIRE(sparam0 == 111);
     REQUIRE(sparam1 == 222);
@@ -261,7 +264,7 @@ TEMPLATE_TEST_CASE("Storage Test", "[storage_test]", delegate::NonMovableType)
     sparam1 = 0;
     sparam2 = 0;
 
-    delegate::Func<TestType, void> delegate16 = lambda16;
+    delegate::Delegate<void> delegate16 = lambda16;
     delegate16();
     REQUIRE(sparam0 == 111);
     REQUIRE(sparam1 == 222);
@@ -274,7 +277,7 @@ TEMPLATE_TEST_CASE("Storage Test", "[storage_test]", delegate::NonMovableType)
     sparam2 = 0;
     sparam3 = 0;
 
-    delegate::Func<TestType, void> delegate20 = lambda20;
+    delegate::Delegate<void> delegate20 = lambda20;
     delegate20();
     REQUIRE(sparam0 == 111);
     REQUIRE(sparam1 == 222);
@@ -288,7 +291,7 @@ TEMPLATE_TEST_CASE("Storage Test", "[storage_test]", delegate::NonMovableType)
     sparam3 = 0;
     sparam4 = 0;
 
-    delegate::Func<TestType, void> delegate24 = lambda24;
+    delegate::Delegate<void> delegate24 = lambda24;
     delegate24();
     REQUIRE(sparam0 == 111);
     REQUIRE(sparam1 == 222);
@@ -298,10 +301,8 @@ TEMPLATE_TEST_CASE("Storage Test", "[storage_test]", delegate::NonMovableType)
     REQUIRE(sparam5 == 666);
 }
 
-/**
- * Test that constructors and destructors.  Also test that delegate copies work correctly.
- */
-TEMPLATE_TEST_CASE("Construct / Destruct", "[construct_destruct]", delegate::NonMovableType)
+/** Test constructors and destructors and that delegate copies work correctly. */
+TEST_CASE("Construct / Destruct", "[construct_destruct]")
 {
     SECTION("Construct / Destruct / Same Copy")
     {
@@ -317,7 +318,7 @@ TEMPLATE_TEST_CASE("Construct / Destruct", "[construct_destruct]", delegate::Non
              * only call constructors for full types.
              */
             ClassFixture fixture;
-            delegate::Func<TestType, int, bool, int> f = [fixture](const bool dump_state, const int i) mutable
+            delegate::Delegate<int, bool, int> f = [fixture](const bool dump_state, const int i) mutable
             {
                 if(dump_state)
                 {
@@ -345,12 +346,12 @@ TEMPLATE_TEST_CASE("Construct / Destruct", "[construct_destruct]", delegate::Non
             /*
              * Make a new delegate and copy over the one above.  No fixture constructors or destructors are called.
              */
-            delegate::Func<TestType, int, bool, int> f_copy = f;
+            delegate::Delegate<int, bool, int> f_copy = f;
             REQUIRE(f_copy(true, 987) == 0);
             REQUIRE(state_ran == true);
             REQUIRE(state_in == 123);
 
-            delegate::Func<TestType, int, bool, int> fff;
+            delegate::Delegate<int, bool, int> fff;
 
             /*
              * The new delegate keeps chugging along.
@@ -370,27 +371,25 @@ TEMPLATE_TEST_CASE("Construct / Destruct", "[construct_destruct]", delegate::Non
             /*
              * Perform a copy assignemnt.
              */
-            delegate::Func<TestType, int, bool, int> f_copy_assign;
+            delegate::Delegate<int, bool, int> f_copy_assign;
             f_copy_assign = f;
         }
 
         /*
-         * Show that the trivial version does less work while the full version does the full monty.
+         * One more destruct than constrct because copy-assign kills the assigned to version before the copy.
          */
-        REQUIRE(ClassFixture::construct_count == 5);
+        REQUIRE(ClassFixture::construct_count == 4);
         REQUIRE(ClassFixture::destruct_count == 5);
     }
 }
 
-/**
- * Test trivial functions (no captures).
- */
-TEMPLATE_TEST_CASE("Trivial Function", "[trivial_function]", delegate::NonMovableType)
+/** Test trivial functions (no captures). */
+TEST_CASE("Trivial Function", "[trivial_function]")
 {
     SECTION("void")
     {
         StaticFixture::init();
-        delegate::Func<TestType, void> f(&StaticFixture::func_void);
+        delegate::Delegate<void> f(&StaticFixture::func_void);
         f();
         REQUIRE(StaticFixture::ran == true);
         REQUIRE(StaticFixture::in == 0);
@@ -398,7 +397,7 @@ TEMPLATE_TEST_CASE("Trivial Function", "[trivial_function]", delegate::NonMovabl
     SECTION("int")
     {
         StaticFixture::init();
-        delegate::Func<TestType, int> f(&StaticFixture::func_int);
+        delegate::Delegate<int> f(&StaticFixture::func_int);
         REQUIRE(f() == 17);
         REQUIRE(StaticFixture::ran == true);
         REQUIRE(StaticFixture::in == 0);
@@ -406,7 +405,7 @@ TEMPLATE_TEST_CASE("Trivial Function", "[trivial_function]", delegate::NonMovabl
     SECTION("void int")
     {
         StaticFixture::init();
-        delegate::Func<TestType, void, int> f(&StaticFixture::func_void_int);
+        delegate::Delegate<void, int> f(&StaticFixture::func_void_int);
         f(21);
         REQUIRE(StaticFixture::ran == true);
         REQUIRE(StaticFixture::in == 21);
@@ -414,22 +413,20 @@ TEMPLATE_TEST_CASE("Trivial Function", "[trivial_function]", delegate::NonMovabl
     SECTION("int int")
     {
         StaticFixture::init();
-        delegate::Func<TestType, int, int> f(&StaticFixture::func_int_int);
+        delegate::Delegate<int, int> f(&StaticFixture::func_int_int);
         REQUIRE(f(33) == 134);
         REQUIRE(StaticFixture::ran == true);
         REQUIRE(StaticFixture::in == 33);
     }
 }
 
-/**
- * Test class functions (implicit this captures and explicit captures).
- */
-TEMPLATE_TEST_CASE("Class Function", "[class_function]", delegate::NonMovableType)
+/** Test class functions (implicit this captures and explicit captures). */
+TEST_CASE("Class Function", "[class_function]")
 {
     SECTION("void")
     {
         ClassFixture fixture;
-        delegate::Func<TestType, void> f(std::bind(&ClassFixture::func_void, &fixture));
+        delegate::Delegate<void> f(std::bind(&ClassFixture::func_void, &fixture));
         f();
         REQUIRE(fixture.ran == true);
         REQUIRE(fixture.in == 0);
@@ -437,7 +434,7 @@ TEMPLATE_TEST_CASE("Class Function", "[class_function]", delegate::NonMovableTyp
     SECTION("int")
     {
         ClassFixture fixture;
-        delegate::Func<TestType, int> f(std::bind(&ClassFixture::func_int, &fixture));
+        delegate::Delegate<int> f(std::bind(&ClassFixture::func_int, &fixture));
         REQUIRE(f() == 17);
         REQUIRE(fixture.ran == true);
         REQUIRE(fixture.in == 0);
@@ -445,7 +442,7 @@ TEMPLATE_TEST_CASE("Class Function", "[class_function]", delegate::NonMovableTyp
     SECTION("void int")
     {
         ClassFixture fixture;
-        delegate::Func<TestType, void, int> f(std::bind(&ClassFixture::func_void_int,
+        delegate::Delegate<void, int> f(std::bind(&ClassFixture::func_void_int,
                                                         &fixture,
                                                         std::placeholders::_1));
         f(21);
@@ -455,24 +452,22 @@ TEMPLATE_TEST_CASE("Class Function", "[class_function]", delegate::NonMovableTyp
     SECTION("int int")
     {
         ClassFixture fixture;
-        delegate::Func<TestType, int, int> f(std::bind(&ClassFixture::func_int_int,
-                                                       &fixture,
-                                                       std::placeholders::_1));
+        delegate::Delegate<int, int> f(std::bind(&ClassFixture::func_int_int,
+                                       &fixture,
+                                       std::placeholders::_1));
         REQUIRE(f(33) == 134);
         REQUIRE(fixture.ran == true);
         REQUIRE(fixture.in == 33);
     }
 }
 
-/**
- * Test lambda functions.
- */
-TEMPLATE_TEST_CASE("Lambda", "[lambda]", delegate::NonMovableType)
+/** Test lambda functions. */
+TEST_CASE("Lambda", "[lambda]")
 {
     SECTION("void")
     {
         ClassFixture fixture;
-        delegate::Func<TestType, void> f([&fixture](){fixture.func_void();});
+        delegate::Delegate<void> f([&fixture](){fixture.func_void();});
         f();
         REQUIRE(fixture.ran == true);
         REQUIRE(fixture.in == 0);
@@ -480,7 +475,7 @@ TEMPLATE_TEST_CASE("Lambda", "[lambda]", delegate::NonMovableType)
     SECTION("int")
     {
         ClassFixture fixture;
-        delegate::Func<TestType, int> f([&fixture](){return fixture.func_int();});
+        delegate::Delegate<int> f([&fixture](){return fixture.func_int();});
         REQUIRE(f() == 17);
         REQUIRE(fixture.ran == true);
         REQUIRE(fixture.in == 0);
@@ -488,7 +483,7 @@ TEMPLATE_TEST_CASE("Lambda", "[lambda]", delegate::NonMovableType)
     SECTION("void int")
     {
         ClassFixture fixture;
-        delegate::Func<TestType, void, int> f([&fixture](int i){fixture.func_void_int(i);});
+        delegate::Delegate<void, int> f([&fixture](int i){fixture.func_void_int(i);});
         f(21);
         REQUIRE(fixture.ran == true);
         REQUIRE(fixture.in == 21);
@@ -496,50 +491,46 @@ TEMPLATE_TEST_CASE("Lambda", "[lambda]", delegate::NonMovableType)
     SECTION("int int")
     {
         ClassFixture fixture;
-        delegate::Func<TestType, int, int> f([&fixture](int i){return fixture.func_int_int(i);});
+        delegate::Delegate<int, int> f([&fixture](int i){return fixture.func_int_int(i);});
         REQUIRE(f(33) == 134);
         REQUIRE(fixture.ran == true);
         REQUIRE(fixture.in == 33);
     }
 }
 
-/**
- * Test uninitialized delegates.
- */
-TEMPLATE_TEST_CASE("Trivial Function Default", "[trivial_function_default]", delegate::NonMovableType)
+/** Test uninitialized delegates. */
+TEST_CASE("Trivial Function Default", "[trivial_function_default]")
 {
     SECTION("default void")
     {
-        delegate::Func<TestType, void> f;
-        f();
+        delegate::Delegate<void> f;
+        REQUIRE(!!f == false);
     }
     SECTION("trivial default int")
     {
-        delegate::Func<TestType, int> f;
-        REQUIRE(f() == 0);
+        delegate::Delegate<int> f;
+        REQUIRE(!!f == false);
     }
     SECTION("default void int")
     {
-        delegate::Func<TestType, void, int> f;
-        f(1);
+        delegate::Delegate<void, int> f;
+        REQUIRE(!!f == false);
     }
     SECTION("default int int")
     {
-        delegate::Func<TestType, int, int> f;
-        REQUIRE(f(1) == 0);
+        delegate::Delegate<int, int> f;
+        REQUIRE(!!f == false);
     }
 }
 
-/**
- * Test type forwarding delegates.
- */
-TEMPLATE_TEST_CASE("Semi-Perfect Forwarding", "[semi_perfect_forwarding]", delegate::NonMovableType)
+/** Test type forwarding delegates. */
+TEST_CASE("Forwarding", "[forwarding]")
 {
     SECTION("non-reference type to non-reference argument")
     {
         ClassFixture::reset_counts();
         {
-            delegate::Func<TestType, void, ClassFixture> f([](ClassFixture fixture){fixture.func_void();});
+            delegate::Delegate<void, ClassFixture> f([](ClassFixture fixture){fixture.func_void();});
             ClassFixture fixture;
             REQUIRE(ClassFixture::construct_count == 1);
             REQUIRE(ClassFixture::destruct_count == 0);
@@ -552,7 +543,7 @@ TEMPLATE_TEST_CASE("Semi-Perfect Forwarding", "[semi_perfect_forwarding]", deleg
     {
         ClassFixture::reset_counts();
         {
-            delegate::Func<TestType, void, ClassFixture> f([](ClassFixture&& fixture){fixture.func_void();});
+            delegate::Delegate< void, ClassFixture> f([](ClassFixture&& fixture){fixture.func_void();});
             ClassFixture fixture;
             REQUIRE(ClassFixture::construct_count == 1);
             REQUIRE(ClassFixture::destruct_count == 0);
@@ -565,7 +556,7 @@ TEMPLATE_TEST_CASE("Semi-Perfect Forwarding", "[semi_perfect_forwarding]", deleg
     {
         ClassFixture::reset_counts();
         {
-            delegate::Func<TestType, void, ClassFixture&&> f([](ClassFixture fixture){fixture.func_void();});
+            delegate::Delegate<void, ClassFixture&&> f([](ClassFixture fixture){fixture.func_void();});
             ClassFixture fixture;
             REQUIRE(ClassFixture::construct_count == 1);
             REQUIRE(ClassFixture::destruct_count == 0);
@@ -578,7 +569,7 @@ TEMPLATE_TEST_CASE("Semi-Perfect Forwarding", "[semi_perfect_forwarding]", deleg
     {
         ClassFixture::reset_counts();
         {
-            delegate::Func<TestType, void, ClassFixture&&> f([](ClassFixture&& fixture){fixture.func_void();});
+            delegate::Delegate<void, ClassFixture&&> f([](ClassFixture&& fixture){fixture.func_void();});
             ClassFixture fixture;
             REQUIRE(ClassFixture::construct_count == 1);
             REQUIRE(ClassFixture::destruct_count == 0);
@@ -589,6 +580,7 @@ TEMPLATE_TEST_CASE("Semi-Perfect Forwarding", "[semi_perfect_forwarding]", deleg
     }
 }
 
+void intf(int i) {printf("intf: %d\n", i);};
 int main(int, char*[])
 {
     Catch::Session session;
@@ -597,4 +589,6 @@ int main(int, char*[])
     session.useConfigData(config_data);
 
     session.run();
+
+    return 0;   
 }

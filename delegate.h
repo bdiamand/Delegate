@@ -1,9 +1,9 @@
 #pragma once
 /*
- * Copyright 2019
+ * Copyright 2019-2022
  * Authored by: Ben Diamand
  *
- * English version - you can use this for whatever you want.  Attribution much
+ * English version - you can use this for whatever you want. Attribution much
  * appreciated but not required.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
@@ -21,43 +21,41 @@
  *
  * ** This comment block must remain in this and derived works.
  */
-
+#include <stdio.h>
 #include <array>
 #include <type_traits>
 #include <utility>
+#include <new>
+#include <exception>
 
 /**
  *                                                  ^^^ Rationale ^^^
  *
- * There are many  examples of std::function replacements, but I was unable to find something that did exactly what
+ * There are many examples of std::function replacements, but I was unable to find something that did exactly what
  * these classes do.  For example, this page has a comparison of a plethora of std::function replacements:
  * https://github.com/jamboree/CxxFunctionBenchmark.
  *
  * The design goals (in order) for this implementation are:
  *      Predictable memory and runtime -> fixed size and heapless
- *      Simple to use with no possible runtime errors, asserts, etc.
+ *      Simple to use.
  *      Fast
  *      Small
  *
  * Fixed (size) delegates are a std::function alternative, with more speed / space performance but less functionality.
  * The differences compared to std:function are:
- *      (Pro) More performant in space and speed than std::function
- *      (Pro) Fixed size, never allocates
- *      (Pro) Never any uninitialized state
- *      (Pro) Can choose to make trivialy constructed delegates, or full featured ones with slightly more memory
- *      (Pro) Documented
- *      (Pro / Con) No explicit support for RTTI or exceptions (no knowledge of exceptions at all)
- *      (Pro / Con) Similar syntax to std::function
+ *      (Pro) Faster than std::function for the same capture sizes
+ *      (Pro) Small fixed size, never allocates
+ *      (Pro) Documented implementation
+ *      (Pro) Uninitialized state except is handled like std::function, with operator bool
+ *      (Pro) Similar but simpler syntax to std::function
+ *      (Pro / Con) No support for RTTI or exceptions (no knowledge of exceptions at all)
  *      (Con) Unable to store arbitrary sized captures - captures must fit the compile-time delegate size
- *      (Con) Unable to return all types (in particular reference types, or any others not default constructable)
  *
  * Note: See the accompanying unit tests for some good examples of use.
  */
 namespace delegate
 {
-    /*
-     * Allow the delegate size to be specified as a compile-time constant.
-     */
+    /** Allow the delegate size to be specified as a compile-time constant. */
     #ifndef DELEGATE_ARGS_SIZE
      #define DELEGATE_ARGS_SIZE sizeof(int) + sizeof(int *)
      #define DELEGATE_ARGS_SIZE_UNDEF
@@ -78,9 +76,7 @@ namespace delegate
     struct TemplateFunctorArgs
     {
     private:
-        /**
-         * The actual storage.
-         */
+        /** The actual storage. */
         alignas(alignment) std::array<char, size> args;
     };
 
@@ -93,9 +89,7 @@ namespace delegate
      #undef DELEGATE_ARGS_ALIGN_UNDEF
     #endif
 
-    /**
-     * A simplifying typedef to make the code more readable.
-     */
+    /** A simplifying name to make the code more readable. */
     using FunctorArgs = TemplateFunctorArgs<>;
 
     /**
@@ -108,6 +102,17 @@ namespace delegate
     {
         return (sizeof(T) <= sizeof(FunctorArgs)) &&
                (std::alignment_of<FunctorArgs>::value % std::alignment_of<T>::value) == 0;
+    }
+
+    /**
+     * Determine the templated class is copyable.
+     * 
+     * @return Returns true if the class is copyable, else false.
+     */
+    template<typename T>
+    constexpr bool can_copy()
+    {
+        return std::is_copy_constructible<T>::value;
     }
 
     /**
@@ -125,7 +130,7 @@ namespace delegate
     }
 
     /**
-     * Store a functor and any associated captured data into a piece of type-erased memory.
+     * Store a functor's associated captured data into a piece of type-erased memory.
      * 
      * @tparam T The functor type.
      * @param args The memory to store to.
@@ -134,11 +139,11 @@ namespace delegate
     template<typename T>
     static void store_functor(FunctorArgs &args, const T &to_store)
     {
-        new (&get_typed_functor<T>(args)) T(to_store);
+        ::new (&get_typed_functor<T>(args)) T(to_store);
     }
 
     /**
-     * Move a functor and any associated captured data into a piece of type-erased memory.
+     * Move a functor's associated captured data into a piece of type-erased memory.
      * 
      * @tparam T The functor type.
      * @param args The memory to store into.
@@ -147,7 +152,7 @@ namespace delegate
     template<typename T>
     static void move_functor(FunctorArgs &args, T &&to_move)
     {
-        new (&get_typed_functor<T>(args)) T(std::move(to_move));
+        ::new (&get_typed_functor<T>(args)) T(std::move(to_move));
     }
 
     /**
@@ -168,47 +173,14 @@ namespace delegate
         return get_typed_functor<T>(args)(std::forward<Arguments>(arguments)...);
     }
 
-    /**
-     * Class used to specialize the delegate.  Selects the non-instantiable delegate.
-     */
-    class NonType
-    {
-    };
-
-    /**
-     * Class used to specialize the delegate.  This one is used to select non-movable types, the most flexible kind.
-     */
-    class NonMovableType
-    {
-    };
-
-    /**
-     * Class used to specialize the delegate.  This one is used to select non-copyable types, the most restrictive kind.
-     */
-    class NonCopyableType
-    {
-    };
-
-    /**
-     * Unspecialized (and unused) delegate class.
-     */
-    template<typename Type, typename Result, typename... Arguments>
-    class Func
-    {
-        Func() = delete;
-    };
-
-    /**
-     * Another (smaller) name for the type-erased call function.
-     */
+    /** Another (smaller) name for the type-erased call function. */
     template<typename Result, typename... Arguments>
     using func_call = Result (*)(const FunctorArgs &args, Arguments&&... arguments);
 
     /**
      * Manual virtual table implementation.  A virtual table is useful because there are multiple functions a full
-     * delegate has beyond the call function (copy and deletion), and storing pointers for each type erased function
-     * would make the delegate larger for no real gain (delegates are expected to be called far more than copied or
-     * moved).
+     * delegate has beyond the call function (copy, move, deletion), and storing pointers for each type erased function
+     * would make the delegate larger for no real gain (delegates are for calling - the other operations are incidental).
      */
     struct Vtable
     {
@@ -220,6 +192,7 @@ namespace delegate
         template<typename T>
         inline static const Vtable &get_vtable()
         {
+            // Fill in the vtable for this type - the same type winds up with the same pointers for each.
             static const Vtable vtable = 
             {
                 typed_copy<T>,
@@ -230,19 +203,13 @@ namespace delegate
             return vtable;
         }
 
-        /**
-         * Reference to the copy function.
-         */
+        /** Reference to the copy function. */
         void (& copy)(FunctorArgs &lhs, const FunctorArgs &rhs);
 
-        /**
-         * Reference to the move function.
-         */
+        /** Reference to the move function. */
         void (& move)(FunctorArgs &lhs, FunctorArgs &&rhs);
 
-        /**
-         * Reference to the destroy function.
-         */
+        /** Reference to the destroy function. */
         void (& destroy)(FunctorArgs &args);
 
         /**
@@ -253,7 +220,7 @@ namespace delegate
          * @param lhs The reference to provide the copied data.
          */
         template<typename T,
-                 typename std::enable_if<std::is_copy_constructible<T>::value, T>::type* = nullptr>
+                 typename std::enable_if<can_copy<T>(), T>::type* = nullptr>
         static void typed_copy(FunctorArgs &lhs, const FunctorArgs &rhs)
         {
             store_functor<T>(lhs, get_typed_functor<T>(rhs));
@@ -263,7 +230,7 @@ namespace delegate
          * Dummy copy.
          *
          * This function exists because there are functors which cannot be copy constructed.  For example, unique_ptr
-         * doesn't allow itself to be copied.  If a delegate has a unique_ptr value capture, the delegate can no longer
+         * doesn't allow itself to be copied. If a delegate has a unique_ptr value capture, the delegate can no longer
          * be copied to another delegate; that would violate the promise unique_ptr makes that there will exist only one
          * actual pointer value.
          *
@@ -272,9 +239,10 @@ namespace delegate
          * @param lhs The reference to provide the copied data.
          */
         template<typename T,
-                 typename std::enable_if<!std::is_copy_constructible<T>::value, T>::type* = nullptr>
+                 typename std::enable_if<!can_copy<T>(), T>::type* = nullptr>
         static void typed_copy(FunctorArgs &, const FunctorArgs &)
         {
+            std::terminate();
         }
 
         /**
@@ -304,68 +272,86 @@ namespace delegate
     };
 
     /**
-     * Base delegate.
+     * Base delegate - usable for the less common case of delegates with non-copyable captures.
      *
-     * Note that this is a perfectly functional class, and passes all unit tests.  It's also an inherently unsafe class,
-     * because it cannot prevent a non-copyable lambda (e.g. one capturing a unique_ptr) from being copied via a copy of
-     * the delegate.  For that reason, it's not itself constructable, and the user must choose between either the
-     * non-movable (most flexible) and non-copyable (most restrictive) variants.
-     *
-     * @tparam Result The delegate return type - must be default constructable.
+     * @tparam Result The delegate return type.
      * @tparam Arguments The delegate function arguments.
      */
     template<typename Result, typename... Arguments>
-    class Func<NonType, Result, Arguments...>
+    class FuncNonCopyable
     {
-    protected:
-        /**
-         * Default constructor.
-         */
-        Func() : Func([](Arguments...){return Result();})
+    public:
+        /** Default constructed delegates, like std::function, are legal but uncallable. */
+        inline static auto badcall = [](Arguments...) -> Result {std::terminate();};
+
+        /** Set the call function to be the right one for the type passed. */
+        template<typename T>
+        void set_call_by_type(const T&)
         {
+            call = &typed_call<T, Result, Arguments...>;
+        }
+
+        /** Set the call function to default to the badcall lambda. */
+        void set_bad_call()
+        {
+            set_call_by_type(badcall);
         }
 
         /**
-         * Functor copy constructor.
-         *
-         * @tparam T The functor type.
-         * @param functor The functor to copy from.
+         * Set the vtable to be the right one for the type passed.
+         * 
+         * @tparam T The lambda type to use for setting the vtable.
          */
         template<typename T>
-        Func(const T &functor) :
-            call(&typed_call<T, Result, Arguments...>),
-            vtable(&Vtable::get_vtable<T>())
+        void set_vtable_by_type(const T&)
         {
-            static_assert(can_emplace<T>(), "Delegate doesn't fit.");
-            static_assert(std::is_same_v<Result, std::invoke_result_t<T, Arguments...>>, "Wrong return type.");
-            store_functor(args, functor);
+            vtable = &Vtable::get_vtable<T>();
         }
 
         /**
-         * Functor move constructor.
+         * Returns whether the current call function matches the one corresponding
+         * to the passed in template parameter.
+         * 
+         * @tparam T The type of the lambda the check against.
+         * @return True if the current call function is the same as the lambda.
+         */
+        template<typename T>
+        bool check_same_call(T&& check) const
+        {
+            return call == &check;
+        }
+
+        /**
+         * Like std::function, returns whether it's safe to call this delegate.
+         * 
+         * @return True if the delegate is safe to call, else false.
+         */
+        explicit operator bool() const
+        {
+            return !check_same_call(typed_call<decltype(badcall), Result, Arguments...>);
+        }
+
+        /** Default constructor. Creates a valid (but uncallable) object. */
+        FuncNonCopyable()
+            : call(&typed_call<decltype(badcall), Result, Arguments...>)
+            , vtable(&Vtable::get_vtable<decltype(badcall)>())
+        {
+        }
+
+        /**
+         * Converting from functor move constructor.
          *
          * @tparam T The functor type.
          * @param functor The functor to move.
          */
         template<typename T>
-        Func(T &&functor) :
+        explicit FuncNonCopyable(T &&functor) :
             call(&typed_call<T, Result, Arguments...>),
             vtable(&Vtable::get_vtable<T>())
         {
+            static_assert(can_emplace<T>(), "Delegate doesn't fit.");
             static_assert(std::is_same_v<Result, std::invoke_result_t<T, Arguments...>>, "Wrong return type.");
             move_functor(args, std::move(functor));
-        }
-
-        /**
-         * Copy Constructor.
-         *
-         * @param other The delegate to copy.
-         */
-        Func(const Func &other) :
-            call(other.call),
-            vtable(other.vtable)
-        {
-            vtable->copy(args, other.args);
         }
 
         /**
@@ -373,17 +359,35 @@ namespace delegate
          *
          * @param other The delegate to move from.
          */
-        Func(Func &&other) :
-            call(other.call),
-            vtable(other.vtable)
+        FuncNonCopyable(FuncNonCopyable &&other) 
+            : call(other.call)
+            , vtable(other.vtable)
         {
             other.vtable->move(args, std::move(other.args));
 
-            /*
-             * Leave other in some well defined state.  Use a named temporary so the move assignment below isn't called.
-             */
-            const Func tmp;
-            other = tmp;
+            /** Leave other in some well defined state. */
+            other.set_bad_call();
+        }
+
+        /**
+         * Functor move assignment operator.
+         *
+         * @param other The delegate to move from.
+         */
+        template<typename T>
+        FuncNonCopyable &operator=(T &&functor)
+        {
+            static_assert(can_emplace<T>(), "Delegate doesn't fit.");
+            static_assert(std::is_same_v<Result, std::invoke_result_t<T, Arguments...>>, "Wrong return type.");
+
+            // Destroy whatever's currently stored before moving the parameter.
+            vtable->destroy(args);
+            move_functor(args, std::move(functor));
+
+            set_call_by_type<T>(functor);
+            set_vtable_by_type<T>(functor);
+
+            return *this;
         }
 
         /**
@@ -393,48 +397,25 @@ namespace delegate
          * 
          * @return Returns a reference to this.
          */
-        Func &operator=(Func &&other)
+        FuncNonCopyable &operator=(FuncNonCopyable &&other)
         {
-            /*
-             * Self move is non-sensical, so no check here for that.
-             */
-            vtable->destroy(args);
-            other.vtable->move(args, std::move(other.args));
-            this->call = other.call;
-            this->vtable = other.vtable;
-
-            /*
-             * Leave other in some well defined state.  Use a named temporary to keep this function from being called.
-             */
-            const Func tmp;
-            other = tmp;
-
-            return *this;
-        }
-
-        /**
-         * Copy assignment operator.
-         *
-         * @param other The delegate to copy from.
-         *
-         * @return Returns a reference to this.
-         */
-        Func &operator=(const Func &other)
-        {
-            if (this == &other)
+            if (&other == this)
             {
                 return *this;
             }
 
             vtable->destroy(args);
-            other.vtable->copy(args, other.args);
+
+            other.vtable->move(args, std::move(other.args));
             this->call = other.call;
             this->vtable = other.vtable;
+
+            // Leave other in some well defined state.
+            other.set_bad_call();
 
             return *this;
         }
 
-    public:
         /**
          * Forwarding function call operator.
          *
@@ -447,18 +428,38 @@ namespace delegate
             return call(args, std::forward<Arguments>(arguments)...);
         }
 
-        /**
-         * Destructor.
-         */
-        ~Func()
+        /** Destructor. */
+        ~FuncNonCopyable()
         {
             vtable->destroy(args);
         }
 
-    private:
+        /** These must be deleted to allow for non-copyable captures (like unique_ptr). */
+        template<typename T>
+        FuncNonCopyable(const T &functor) = delete;
+        FuncNonCopyable(const FuncNonCopyable &other) = delete;
+        FuncNonCopyable &operator=(const FuncNonCopyable &other) = delete;
+        template<typename T>
+        FuncNonCopyable &operator=(FuncNonCopyable &other) = delete;
+
+    protected:
         /**
-         * The delegate arguments (function pointers and / or captures go here).
+         * Construct a new Func object with both the call and vtable set to the
+         * passed in ones. Used by the CopyableType's copy constructors. 
+         * 
+         * @tparam C The call type.
+         * @tparam V The vtable type.
+         * @param call_type The call function to set.
+         * @param vtable_type The vtable to set.
          */
+        template <typename C, typename V>
+        FuncNonCopyable(C call_type, V vtable_type)
+            : call(call_type)
+            , vtable(vtable_type)
+        {
+        }
+
+        /** The delegate arguments (function pointers and / or captures go here). */
         FunctorArgs args;
 
         /**
@@ -475,56 +476,99 @@ namespace delegate
     };
 
     /**
-     * Overload of Func which restricts users to only non-movable capture types.
+     * Copyable delegate - usable for the more common case of delegates with copyable captures.
      *
-     * All functions are pure pass through to the base class, and only exist to make them public.
-     *
-     * @tparam Result The return type.
-     * @tparam Arguments The functor argument types.
+     * @tparam Result The delegate return type.
+     * @tparam Arguments The delegate function arguments.
      */
     template<typename Result, typename... Arguments>
-    class Func<NonMovableType, Result, Arguments...> : public Func<NonType, Result, Arguments...>
+    class FuncCopyable : protected FuncNonCopyable<Result, Arguments...>
     {
     public:
-        Func() = default;
+        /** Type used to bring forward the useful functions from the base class. */
+        using FNC = FuncNonCopyable<Result, Arguments...>;
+        using FNC::operator();
+        using FNC::operator bool;
 
-        Func(const Func &other) = default;
-        
-        Func &operator=(const Func &other) = default;
-
-        template<typename T>
-        Func(const T &functor) : Func<NonType, Result, Arguments...>(functor)
+        /** Default constructor. Leave the object in an uninitialized state (see operator bool). */
+        FuncCopyable() : FNC()
         {
+        }
+    
+        /**
+         * Converting from functor move constructor. This could have been pass by value,
+         * but the parent's move constructor exists so this saves some code. The cost
+         * is roughly the same.
+         *
+         * @tparam T The functor type.
+         * @param functor The functor to move.
+         */
+        template<typename T>
+        FuncCopyable(const T& functor) : FNC(&typed_call<T, Result, Arguments...>, &Vtable::get_vtable<T>())
+        {
+            static_assert(can_copy<T>(), "Object is non-copyable");
+            store_functor(this->args, functor);
+        }
+
+        /**
+         * Copy constructor.
+         *
+         * @param other The delegate to move from.
+         */
+        FuncCopyable(const FuncCopyable &other) : FNC(other.call, other.vtable)
+        {
+            this->vtable->copy(this->args, other.args);
+        }
+
+        /**
+         * Copy functor assignment operator.
+         * 
+         * @param other The delegate to copy from.
+         * 
+         * @return Returns a reference to this.
+         */
+        template<typename T>
+        FuncCopyable &operator=(const T& functor)
+        {
+            static_assert(can_emplace<T>(), "Delegate doesn't fit.");
+            static_assert(std::is_same_v<Result, std::invoke_result_t<T, Arguments...>>, "Wrong return type.");
+            static_assert(can_copy<T>(), "Object is non-copyable");
+
+            store_functor(this->args, functor);
+            FNC::template set_call_by_type<T>(functor);
+            FNC::template set_vtable_by_type<T>(functor);
+
+            return *this;
+        }
+
+        /**
+         * Copy assignment operator.
+         *
+         * @param other The delegate to copy from.
+         *
+         * @return Returns a reference to this.
+         */
+        FuncCopyable &operator=(const FuncCopyable &other)
+        {
+            if (this == &other)
+            {
+                return *this;
+            }
+
+            this->vtable->destroy(this->args);
+            this->vtable->copy(this->args, other.args);
+            this->call = other.call;
+            this->vtable = other.vtable;
+
+            return *this;
         }
     };
 
-    /**
-     * Overload of Func which restricts users to only non-copyable capture types.
-     *
-     * All functions are pure pass through to the base class, and only exist to make them public.
-     *
-     * @tparam Result The return type.
-     * @tparam Arguments The functor argument types.
-     */
+    /** The following two are convenient names for the delegates. */
     template<typename Result, typename... Arguments>
-    class Func<NonCopyableType, Result, Arguments...> : public Func<NonType, Result, Arguments...>
-    {
-    public:
-        Func() = default;
-
-        Func(Func &&other) = default;
-
-        Func &operator=(Func &&other) = default;
-
-        template<typename T>
-        Func(T &&functor) : Func<NonType, Result, Arguments...>(std::move(functor))
-        {
-        }
-    };
+    using MoveDelegate = FuncNonCopyable<Result, Arguments...>;
 
     template<typename Result, typename... Arguments>
-    using MoveDelegate = Func<NonCopyableType, Result, Arguments...>;
-
-    template<typename Result, typename... Arguments>
-    using Delegate = Func<NonMovableType, Result, Arguments...>;
+    using Delegate = FuncCopyable<Result, Arguments...>;
 }
+
